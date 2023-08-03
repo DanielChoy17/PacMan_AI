@@ -1,6 +1,5 @@
 from pacai.agents.learning.reinforcement import ReinforcementAgent
 from pacai.util import reflection
-from pacai.util.probability import flipCoin, random
 
 class QLearningAgent(ReinforcementAgent):
     """
@@ -47,7 +46,6 @@ class QLearningAgent(ReinforcementAgent):
         super().__init__(index, **kwargs)
 
         # You can initialize Q-values here.
-        self.values = {}
 
     def getQValue(self, state, action):
         """
@@ -56,7 +54,7 @@ class QLearningAgent(ReinforcementAgent):
         Should return 0.0 if the (state, action) pair has never been seen.
         """
 
-        return self.values.get((state, action), 0.0)
+        return 0.0
 
     def getValue(self, state):
         """
@@ -70,17 +68,8 @@ class QLearningAgent(ReinforcementAgent):
         which returns the actual best action.
         Whereas this method returns the value of the best action.
         """
-        possible_actions = self.getLegalActions(state)
-        if len(possible_actions) == 0:
-            return 0.0
 
-        max_value = float("-inf")
-        for action in possible_actions:
-            qvalue = self.getQValue(state, action)
-            if (max_value == float("-inf")) or (max_value <= qvalue):
-                max_value = qvalue
-
-        return max_value
+        return 0.0
 
     def getPolicy(self, state):
         """
@@ -94,38 +83,8 @@ class QLearningAgent(ReinforcementAgent):
         which returns the value of the best action.
         Whereas this method returns the best action itself.
         """
-        possible_actions = self.getLegalActions(state)
-        if len(possible_actions) == 0:
-            return None
 
-        max_value = float("-inf")
-        max_action = ""
-        for action in possible_actions:
-            qvalue = self.getQValue(state, action)
-            if (max_value == float("-inf")) or (max_value < qvalue):
-                max_value = qvalue
-                max_action = action
-            elif max_value == qvalue:
-                max_action = random.choice([max_action, action])
-
-        return max_action
-
-    def update(self, state, action, nextState, reward):
-        self.values[(state, action)] = (((1 - self.getAlpha()) * self.getQValue(state, action))
-                                        + (self.getAlpha() * (reward + (self.getDiscountRate()
-                                            * self.getValue(nextState)))))
-
-    def getAction(self, state):
-        possible_actions = self.getLegalActions(state)
-        if len(possible_actions) == 0:
-            return None
-
-        if flipCoin(self.getEpsilon()):
-            action = random.choice(possible_actions)
-        else:
-            action = self.getPolicy(state)
-
-        return action
+        return None
 
 class PacmanQAgent(QLearningAgent):
     """
@@ -177,27 +136,6 @@ class ApproximateQAgent(PacmanQAgent):
         self.featExtractor = reflection.qualifiedImport(extractor)
 
         # You might want to initialize weights here.
-        self.weights = {}
-
-    def getQValue(self, state, action):
-        features = self.featExtractor.getFeatures(self, state, action)
-        qvalue = 0
-
-        for feature in features:
-            if feature not in self.weights:
-                self.weights[feature] = 0
-            qvalue = qvalue + (features[feature] * self.weights[feature])
-
-        return qvalue
-
-    def update(self, state, action, nextState, reward):
-        features = self.featExtractor.getFeatures(self, state, action)
-        correction = ((reward + (self.discountRate * self.getValue(nextState)))
-                      - self.getQValue(state, action))
-
-        for feature in features:
-            self.weights[feature] = (self.weights[feature]
-                                    + (self.getAlpha() * correction * features[feature]))
 
     def final(self, state):
         """
@@ -211,4 +149,4 @@ class ApproximateQAgent(PacmanQAgent):
         if self.episodesSoFar == self.numTraining:
             # You might want to print your weights here for debugging.
             # *** Your Code Here ***
-            print(self.weights)
+            raise NotImplementedError()

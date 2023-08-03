@@ -39,24 +39,7 @@ class ValueIterationAgent(ValueEstimationAgent):
         self.values = {}  # A dictionary which holds the q-values for each state.
 
         # Compute the values here.
-        while self.iters > 0:
-            temp_values = self.values.copy()
-            all_states = mdp.getStates()
-            for state in all_states:
-                possible_actions = mdp.getPossibleActions(state)
-                possible_qvalues = []
-                for action in possible_actions:
-                    next_states_info = mdp.getTransitionStatesAndProbs(state, action)
-                    qvalue = 0
-                    for next_state_info in next_states_info:
-                        next_state = next_state_info[0]
-                        probability = next_state_info[1]
-                        qvalue = qvalue + (probability * (mdp.getReward(state, action, next_state)
-                                    + (self.discountRate * temp_values.get(next_state, 0.0))))
-                    possible_qvalues.append(qvalue)
-                if len(possible_qvalues) != 0:
-                    self.values[state] = max(possible_qvalues)
-            self.iters = self.iters - 1
+        raise NotImplementedError()
 
     def getValue(self, state):
         """
@@ -71,26 +54,3 @@ class ValueIterationAgent(ValueEstimationAgent):
         """
 
         return self.getPolicy(state)
-
-    def getQValue(self, state, action):
-        next_states_info = self.mdp.getTransitionStatesAndProbs(state, action)
-        qvalue = 0.0
-        for next_state_info in next_states_info:
-            next_state = next_state_info[0]
-            probability = next_state_info[1]
-            qvalue = qvalue + (probability * (self.mdp.getReward(state, action, next_state)
-                + (self.discountRate * self.getValue(next_state))))
-        return qvalue
-
-    def getPolicy(self, state):
-        if self.mdp.isTerminal(state):
-            return None
-        possible_actions = self.mdp.getPossibleActions(state)
-        best_policy = ""
-        best_qvalue = float("-inf")
-        for action in possible_actions:
-            qvalue = self.getQValue(state, action)
-            if (best_policy == "" and best_qvalue == float("-inf")) or (qvalue >= best_qvalue):
-                best_policy = action
-                best_qvalue = qvalue
-        return best_policy

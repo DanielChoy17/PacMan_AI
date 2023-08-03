@@ -2,6 +2,7 @@ import random
 
 from pacai.agents.base import BaseAgent
 from pacai.agents.search.multiagent import MultiAgentSearchAgent
+from pacai.core.distance import manhattan
 
 class ReflexAgent(BaseAgent):
     """
@@ -57,8 +58,44 @@ class ReflexAgent(BaseAgent):
         # newScaredTimes = [ghostState.getScaredTimer() for ghostState in newGhostStates]
 
         # *** Your Code Here ***
+        # Getting the food/capsules available before and after taking the action
+        oldFood = currentGameState.getFood().asList()
+        newFood = successorGameState.getFood().asList()
+        oldCapsules = currentGameState.getCapsules()
+        newCapsules = successorGameState.getCapsules()
 
-        return successorGameState.getScore()
+        # Checking if PacMan ate a food or not after taking the action
+        ate_food_points = 0
+        if len(oldFood) != len(newFood):
+            ate_food_points = 1000
+
+        # Checking if Pacman ate a capsule or not after taking the action
+        ate_capsule_points = 0
+        if len(oldCapsules) != len(newCapsules):
+            ate_capsule_points = 200
+
+        # Getting the closest and furthest food pellet after taking the action
+        newPosition = successorGameState.getPacmanPosition()
+        closest_pellet_distance = -1
+        furthest_pellet_distance = -1
+        for food in newFood:
+            distance = manhattan(newPosition, food)
+            if closest_pellet_distance == -1 or closest_pellet_distance > distance:
+                closest_pellet_distance = distance
+            if furthest_pellet_distance == -1 or distance > furthest_pellet_distance:
+                furthest_pellet_distance = distance
+
+        # Calculating the number of ghosts that are extremely close
+        close_ghosts_counter = 0
+        ghost_positions = successorGameState.getGhostPositions()
+        for ghostPosition in ghost_positions:
+            distance = manhattan(newPosition, ghostPosition)
+            if distance <= 1:
+                close_ghosts_counter = close_ghosts_counter + 1
+
+        return (successorGameState.getScore() - closest_pellet_distance
+            - furthest_pellet_distance - (close_ghosts_counter * 10000)
+            + ate_food_points + ate_capsule_points)
 
 class MinimaxAgent(MultiAgentSearchAgent):
     """
@@ -90,6 +127,47 @@ class MinimaxAgent(MultiAgentSearchAgent):
     def __init__(self, index, **kwargs):
         super().__init__(index, **kwargs)
 
+    def getAction(self, gameState):
+        def value(agent, depth, s):
+            if s.isLose() or s.isWin() or depth == self.getTreeDepth():
+                return self.getEvaluationFunction()(s)
+            if agent == 0:
+                return maxValue(agent, depth, s)
+            else:
+                return minValue(agent, depth, s)
+
+        def maxValue(agent, depth, s):
+            max = float('-inf')
+            for action in s.getLegalActions(0):
+                temp_value = value(1, depth, s.generateSuccessor(0, action))
+                if temp_value > max:
+                    max = temp_value
+            return max
+
+        def minValue(agent, depth, s):
+            nextAgent = agent + 1
+            if nextAgent == s.getNumAgents():
+                nextAgent = 0
+                depth = depth + 1
+
+            min = float('inf')
+            for action in s.getLegalActions(agent):
+                temp_value = value(nextAgent, depth, s.generateSuccessor(agent, action))
+                if temp_value < min:
+                    min = temp_value
+            return min
+
+        # Collect legal moves.
+        legalMoves = gameState.getLegalActions(0)
+
+        # Choose one of the best actions.
+        scores = [value(1, 0, gameState.generateSuccessor(0, action)) for action in legalMoves]
+        bestScore = max(scores)
+        bestIndices = [index for index in range(len(scores)) if scores[index] == bestScore]
+        chosenIndex = random.choice(bestIndices)  # Pick randomly among the best.
+
+        return legalMoves[chosenIndex]
+
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
     A minimax agent with alpha-beta pruning.
@@ -104,6 +182,57 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
 
     def __init__(self, index, **kwargs):
         super().__init__(index, **kwargs)
+
+    def getAction(self, gameState):
+        def value(agent, depth, s, alpha, beta):
+            if s.isLose() or s.isWin() or depth == self.getTreeDepth():
+                return self.getEvaluationFunction()(s)
+            if agent == 0:
+                return maxValue(agent, depth, s, alpha, beta)
+            else:
+                return minValue(agent, depth, s, alpha, beta)
+
+        def maxValue(agent, depth, s, alpha, beta):
+            max_val = float('-inf')
+            for action in s.getLegalActions(0):
+                temp_value = value(1, depth, s.generateSuccessor(0, action), alpha, beta)
+                if temp_value > max_val:
+                    max_val = temp_value
+                alpha = max(alpha, temp_value)
+                if beta <= alpha:
+                    break
+            return max_val
+
+        def minValue(agent, depth, s, alpha, beta):
+            nextAgent = agent + 1
+            if nextAgent == s.getNumAgents():
+                nextAgent = 0
+                depth = depth + 1
+
+            min_val = float('inf')
+            for action in s.getLegalActions(agent):
+                temp_value = value(nextAgent, depth,
+                                s.generateSuccessor(agent, action), alpha, beta)
+                if temp_value < min_val:
+                    min_val = temp_value
+                beta = min(beta, temp_value)
+                if beta <= alpha:
+                    break
+            return min_val
+
+        # Collect legal moves.
+        legalMoves = gameState.getLegalActions(0)
+
+        # Choose one of the best actions.
+        alpha = float('-inf')
+        beta = float('inf')
+        scores = [value(1, 0, gameState.generateSuccessor(0, action), alpha, beta)
+                  for action in legalMoves]
+        bestScore = max(scores)
+        bestIndices = [index for index in range(len(scores)) if scores[index] == bestScore]
+        chosenIndex = random.choice(bestIndices)  # Pick randomly among the best.
+
+        return legalMoves[chosenIndex]
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
@@ -122,14 +251,83 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
     def __init__(self, index, **kwargs):
         super().__init__(index, **kwargs)
 
+    def getAction(self, gameState):
+        def value(agent, depth, s):
+            if s.isLose() or s.isWin() or depth == self.getTreeDepth():
+                return self.getEvaluationFunction()(s)
+            if agent == 0:
+                return maxValue(agent, depth, s)
+            else:
+                return minValue(agent, depth, s)
+
+        def maxValue(agent, depth, s):
+            max = float('-inf')
+            for action in s.getLegalActions(0):
+                temp_value = value(1, depth, s.generateSuccessor(0, action))
+                if temp_value > max:
+                    max = temp_value
+            return max
+
+        def minValue(agent, depth, s):
+            nextAgent = agent + 1
+            if nextAgent == s.getNumAgents():
+                nextAgent = 0
+                depth = depth + 1
+
+            sum = 0
+            for action in s.getLegalActions(agent):
+                temp_value = value(nextAgent, depth, s.generateSuccessor(agent, action))
+                sum = sum + temp_value
+            return sum / len(s.getLegalActions(agent))
+
+        # Collect legal moves.
+        legalMoves = gameState.getLegalActions(0)
+
+        # Choose one of the best actions.
+        scores = [value(1, 0, gameState.generateSuccessor(0, action)) for action in legalMoves]
+        bestScore = max(scores)
+        bestIndices = [index for index in range(len(scores)) if scores[index] == bestScore]
+        chosenIndex = random.choice(bestIndices)  # Pick randomly among the best.
+
+        return legalMoves[chosenIndex]
+
 def betterEvaluationFunction(currentGameState):
     """
     Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable evaluation function.
 
     DESCRIPTION: <write something here so we know what you did>
     """
+    # Getting the food/capsules available
+    food_available = currentGameState.getFood().asList()
+    capsules_available = len(currentGameState.getCapsules())
 
-    return currentGameState.getScore()
+    # Getting the closest food pellet
+    position = currentGameState.getPacmanPosition()
+    closest_pellet_distance = -1
+    for food in food_available:
+        distance = manhattan(position, food)
+        if closest_pellet_distance == -1 or closest_pellet_distance > distance:
+            closest_pellet_distance = distance
+
+    # Calculating the number of ghosts that are extremely close
+    # and the sum of all the distances from Pacman to the ghosts
+    close_ghosts_counter = 0
+    ghost_positions = currentGameState.getGhostPositions()
+    total_ghost_distance = 1
+    for ghostPosition in ghost_positions:
+        distance = manhattan(position, ghostPosition)
+        total_ghost_distance = total_ghost_distance + distance
+        if distance <= 1:
+            close_ghosts_counter = close_ghosts_counter + 1
+
+    # Giving a big bonus point if state is a winning state
+    won_state_bonus = 0
+    if currentGameState.isWin():
+        won_state_bonus = 100000000
+
+    return (currentGameState.getScore() + (1 / closest_pellet_distance)
+        - (1 / total_ghost_distance) - (close_ghosts_counter * 10000)
+        - capsules_available + won_state_bonus)
 
 class ContestAgent(MultiAgentSearchAgent):
     """
